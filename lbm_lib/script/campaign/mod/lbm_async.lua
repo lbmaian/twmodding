@@ -112,6 +112,8 @@ local async_processor_ui_trigger_prefix = "AsyncProcessor" .. string.char(31)
 
 -- async_trampoline's main "loop" are comprised of two mutually recursive functions that are tail call optimized (so also won't result in stack overflow).
 -- This takes advantage of Continuation Passing Style approach to avoid the need to expensively pack/unpack args (that would've been needed in a standard loop).
+-- The "loop" essentially keeps resuming the async coroutine as long as next_trigger_time remains nil, running any coroutine-yielded function each iteration.
+-- This mechanism allows delegation of function calls that must be run in the main coroutine.
 local async_coroutine_resume, process_async_coroutine_resume_results
 
 function async_coroutine_resume(async_entry, ...)
@@ -152,24 +154,8 @@ local function async_trampoline(id)
         return
     end
     
-    -- Keep resuming coroutine as long as next_trigger_time remains nil. Run any coroutine-yielded function.
-    -- This mechanism allows delegation of function calls that must be run in the main coroutine.
+    -- Main "loop"
     async_entry.next_trigger_time = nil
-    --[[
-    local co = async_entry.coroutine
-    local num_a = 0
-    local a1, a2, a3, a4, a5, a_rest -- return values or arguments, with a_rest being an array of the 6th+ values/arguments or nil if <= 5 values/arguments
-    repeat
-        --out("async_trampoline: main loop: coroutine: " .. tostring(coroutine.running()) .. ", args: {" .. utils.serialize(pass_variadic_args(num_a, a1, a2, a3, a4, a5, a_rest)) ..
-        --    "}, next_trigger_time @ " .. tostring(async_entry.next_trigger_time))
-        num_a, a1, a2, a3, a4, a5, a_rest = process_async_coroutine_resume_results(async_entry, coroutine.resume(co, pass_variadic_args(num_a, a1, a2, a3, a4, a5, a_rest)))
-        if coroutine.status(co) == "dead" then
-            --out("async_trampoline: done")
-            remove_async_entry(async_entry)
-            return
-        end
-    until async_entry.next_trigger_time ~= nil
-    --]]
     local done = async_coroutine_resume(async_entry)
     if done then
         return
@@ -193,19 +179,20 @@ local function async_trampoline(id)
 end
 
 core:add_listener(
-    "UITriggerScriptEvent:AsyncProcessor",
+    "UITriggerScriptEvent:async_trampoline",
     "UITriggerScriptEvent",
     function(context)
         return context:trigger():starts_with(async_processor_ui_trigger_prefix)
     end,
     function(context)
         local id = tonumber(context:trigger():sub(string.len(async_processor_ui_trigger_prefix) + 1), 10)
-        --out("UITriggerScriptEvent:AsyncProcessor " .. id)
+        --out("UITriggerScriptEvent:async_trampoline: id=" .. id)
         async_trampoline(id)
     end,
     true
 )
 
+-- async(func)
 setmetatable(async, {
     __call = function(self, func)
         update_all_game_object_functions()
@@ -228,6 +215,7 @@ local function schedule_async_callback(id, delay)
     coroutine.yield()
 end
 
+-- TODO implement rest of utils.retry_callback features
 function async.retry(func, max_tries, delay)
     local id = async.id()
     if id == nil then
