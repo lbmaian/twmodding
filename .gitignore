@@ -39,3 +39,11 @@ luac.out
 *.x86_64
 *.hex
 
+# Ignore everything in the root
+/*
+# Whitelist specific directories in root
+!/lbm_lib/
+# Whitelist certain files in root
+!.gitignore
+!.luacheckrc
+!README.md
