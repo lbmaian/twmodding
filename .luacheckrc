@@ -1,5 +1,6 @@
 include_files = {
     "**/lbm*/script/**/*.lua",
+    "**/zzz_lbm*/script/**/*.lua",
 }
 ignore = {
     "212", -- Unused argument.
