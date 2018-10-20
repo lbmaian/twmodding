@@ -379,9 +379,9 @@ function utils.retry_callback(callback, max_tries, base_delay, exponential_backo
     end, base_delay, callback_name)
 end
 
--- Adds a UITriggerScriptEvent event listener that conditions on the given faction CQI and event name
+-- Adds a UITriggerScriptEvent event listener that conditions on the given CQI (typically faction CQI, can be nil) and event name
 -- and calls the given handler with all arguments passed to the trigger_custom_ui_event() call except the first arg (event_name).
--- For example: trigger_custom_ui_event(event_name, faction_cqi, 1, "x", {a=0}) results in the handler for event_name being called with arguments (faction_cqi, 1, "x", {a=0}).
+-- For example: trigger_custom_ui_event(event_name, cqi, 1, "x", {a=0}) results in the handler for event_name being called with arguments (cqi, 1, "x", {a=0}).
 function utils.add_custom_ui_event_listener(event_name, handler, persistent)
     if persistent == nil then
         persistent = true
@@ -393,21 +393,42 @@ function utils.add_custom_ui_event_listener(event_name, handler, persistent)
             return context:trigger():starts_with(event_name .. string.char(31))
         end,
         function(context)
-            local faction_cqi, trigger_str = context:faction_cqi(), context:trigger()
-            out.ui("UITriggerScriptEvent: faction_cqi=" .. tostring(faction_cqi) .. ", trigger=" .. tostring(trigger_str))
+            local cqi, trigger_str = context:faction_cqi(), context:trigger()
+            out.ui("UITriggerScriptEvent: cqi=" .. tostring(cqi) .. ", trigger=" .. tostring(trigger_str))
             local return_args_str = trigger_str:sub(event_name:len() + 1 + 1) -- looks like e.g. "<event_name>,{key=value}" or "'arg1', 'arg2'"
-            handler(faction_cqi, loadstring("return " .. return_args_str)()) -- calls handler with the faction_cqi and all returned args
+            handler(cqi, loadstring("return " .. return_args_str)()) -- calls handler with the cqi and all returned args
         end,
         persistent
     )
 end
 
--- Triggers a UITriggerScriptEvent with a specially serialized trigger that the handler given to add_custom_ui_event_listener() can parse.
--- See add_custom_ui_event_listener() for an example.
-function utils.trigger_custom_ui_event(event_name, faction_cqi, ...)
+-- Triggers a UITriggerScriptEvent with a specially serialized trigger string and CQI (typically faction CQI, can be nil)
+-- that the handler given to add_custom_ui_event_listener() can parse. See add_custom_ui_event_listener() for an example.
+function utils.trigger_custom_ui_event(event_name, cqi, ...)
     local trigger_str = event_name .. string.char(31) .. utils.serialize(...)
-    out.ui("trigger_custom_ui_event: faction_cqi=" .. faction_cqi .. ", trigger=" .. trigger_str)
-    CampaignUI.TriggerCampaignScriptEvent(faction_cqi, trigger_str)
+    out.ui("trigger_custom_ui_event: cqi=" .. cqi .. ", trigger=" .. trigger_str)
+    CampaignUI.TriggerCampaignScriptEvent(cqi, trigger_str)
+end
+
+-- Weak set of callbacks, so that when the callback is gc'ed, it'll be automatically cleaned from this table
+local core_monitor_performance_blacklist = setmetatable({}, {__mode = "k"})
+
+-- Override core:monitor_performance to allow conditional disabling of the performance monitoring based off a blacklist.
+local orig_core_monitor_performance = core.monitor_performance
+function core.monitor_performance(self, callback, time_limit, name)
+    -- If in the blacklist, just call the callback without performance monitoring.
+    if core_monitor_performance_blacklist[callback] then
+        callback()
+    else
+        orig_core_monitor_performance(self, callback, time_limit, name)
+    end
+end
+
+-- Creates a callback via cm:callback while disabling performance monitoring (that can cause the "PERFORMANCE WARNING" to be logged) for this callback.
+function utils.callback_without_performance_monitor(callback, time, name)
+    local ret_val = cm:callback(callback, time, name)
+    core_monitor_performance_blacklist[callback] = true -- only add to blacklist if cm:callback didn't fail
+    return ret_val
 end
 
 function utils.campaign_obj_to_string(input)
