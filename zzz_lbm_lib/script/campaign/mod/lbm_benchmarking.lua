@@ -62,7 +62,8 @@ local function run_benchmark(max_time, max_iters, check_time_every_n_iters, name
     if control_time_per_iter == nil then
         control_time_per_iter = time_per_iter
     end
-    out(string.format("%-50s|%14d |%12.3fs |%12.3fns |%12.3fns", name, num_iters, time_elapsed, time_per_iter, time_per_iter - control_time_per_iter))
+    out(string.format("%-50s|%14.0f |%12.3fs |%12.3fns |%12.3fns", -- %d seems bound within 4-byte integer range, so use %.0f instead
+        name, num_iters, time_elapsed, time_per_iter, time_per_iter - control_time_per_iter))
     collectgarbage()
     collectgarbage() -- 2nd collectgarbage finalizes objects used in any gc finalizers
     return {
@@ -95,7 +96,6 @@ function benchmarking:run_suite()
 end
 
 function benchmarking:aggregate_results(suite_results)
-    local num_suite_results = #suite_results
     local control_name = self.control_name
     local names = {control_name, unpack(self.names)}
     
@@ -104,7 +104,6 @@ function benchmarking:aggregate_results(suite_results)
         local aggregate_record = {
             num_iters = 0,
             time_elapsed = 0,
-            mean_time_per_iter = 0,
         }
         aggregate_records[name] = aggregate_record
     end
@@ -114,25 +113,22 @@ function benchmarking:aggregate_results(suite_results)
             local aggregate_record = aggregate_records[name]
             aggregate_record.num_iters = aggregate_record.num_iters + record.num_iters
             aggregate_record.time_elapsed = aggregate_record.time_elapsed + record.time_elapsed
-            aggregate_record.mean_time_per_iter = aggregate_record.mean_time_per_iter + record.time_per_iter / num_suite_results
         end
     end
     
     out("BENCHMARKS AGGREGATE")
     out("--------------------")
-    out("NAME                                              | # ITERS       | TIME ELAPSED  | TIME PER ITER | MINUS CONTROL | AVG TIME PER ITER | MINUS AVG CONTROL")
-    out("---------------------------------------------------------------------------------------------------------------------------------------------------------")
+    out("NAME                                              | # ITERS       | TIME ELAPSED  | TIME PER ITER | MINUS CONTROL")
+    out("-----------------------------------------------------------------------------------------------------------------")
     local aggregate_control_record = aggregate_records[control_name]
     local aggregate_control_time_per_iter = aggregate_control_record.time_elapsed / aggregate_control_record.num_iters * 1000000000 -- in nanoseconds
     for _, name in ipairs(names) do
         local aggregate_record = aggregate_records[name]
         local aggregate_time_per_iter = aggregate_record.time_elapsed / aggregate_record.num_iters * 1000000000 -- in nanoseconds
-        out(string.format("%-50s|%14d |%12.3fs |%12.3fns |%12.3fns |%16.3fns |%16.3fns", name,
-            aggregate_record.num_iters, aggregate_record.time_elapsed,
-            aggregate_time_per_iter, aggregate_time_per_iter - aggregate_control_time_per_iter,
-            aggregate_record.mean_time_per_iter, aggregate_record.mean_time_per_iter - aggregate_control_record.mean_time_per_iter))
+        out(string.format("%-50s|%14.0f |%12.3fs |%12.3fns |%12.3fns", -- %d seems bound within 4-byte integer range, so use %.0f instead
+            name, aggregate_record.num_iters, aggregate_record.time_elapsed, aggregate_time_per_iter, aggregate_time_per_iter - aggregate_control_time_per_iter))
     end
-    out("---------------------------------------------------------------------------------------------------------------------------------------------------------")
+    out("-----------------------------------------------------------------------------------------------------------------")
     return aggregate_records
 end
 

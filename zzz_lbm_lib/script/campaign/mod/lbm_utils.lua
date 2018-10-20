@@ -1,4 +1,4 @@
--- Language utility functions
+-- General utility functions
 ---------------------------------------------------------------------
 
 local utils = {}
@@ -47,7 +47,7 @@ function utils.serialize(...)
     end
     local val_type = type(val)
     if val_type == "string" then
-        return '"' .. val:gsub("\\", "\\\\"):gsub('"', '\\"') .. '"'
+        return string.format("%q", val)
     elseif val_type == "number" or val_type == "boolean" then
         return tostring(val)
     elseif val_type == "table" then
@@ -87,7 +87,7 @@ function utils.to_json(val)
     elseif val_type == "number" or val_type == "boolean" then
         return tostring(val)
     elseif val_type == "string" then
-        return '"' .. val:gsub("\\", "\\\\"):gsub('"', '\\"') .. '"'
+        return string.to_json(val)
     else -- unserializable value like function, thread, or userdata - just wrap its tostring value in quotes and angle brackets
         return '"<' .. tostring(val) .. '>"'
     end
@@ -146,8 +146,12 @@ function utils.timed_call(func, ...)
     return prepend_time_diff(os.clock(), func(...))
 end
 
+
+-- Lua Standard Library extensions
+---------------------------------------------------------------------
+
 function string.to_json(s)
-    return '"' .. s .. '"'
+    return string.gsub(string.format("%q", s), "\\\n", "\\n")
 end
 
 function string.at(s, i)
