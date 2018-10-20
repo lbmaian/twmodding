@@ -42,6 +42,7 @@ luac.out
 # Ignore everything in the root
 /*
 # Whitelist specific directories in root
+!/lbm_test*/
 !/zzz_lbm_lib/
 # Whitelist certain files in root
 !.gitignore
