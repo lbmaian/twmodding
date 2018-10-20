@@ -99,7 +99,12 @@ BENCHMARKS AGGREGATE
 NAME                                              | # ITERS       | TIME ELAPSED  | TIME PER ITER | MINUS CONTROL
 -----------------------------------------------------------------------------------------------------------------
 control (only benchmarking overhead)              |    4000000000 |      99.574s |      24.893ns |       0.000ns
-new table                                         |    1764997120 |     480.004s |     271.957ns |     247.064ns
+new table with 0 items                            |    2155362048 |     480.004s |     222.702ns |     197.809ns
+new table with 2 items                            |    1744903936 |     480.005s |     275.090ns |     250.197ns
+new table with 20 items                           |     799800000 |     480.008s |     600.160ns |     575.267ns
+new table with 20 key-values                      |     372769024 |     480.010s |    1287.687ns |    1262.794ns
+pass/access 20 param access                       |    4000000000 |     341.598s |      85.400ns |      60.507ns
+pass/access list param with 20 items              |    2478748928 |     480.004s |     193.648ns |     168.755ns
 noop with 0 args                                  |    4000000000 |     205.769s |      51.442ns |      26.549ns
 noop with 2 args                                  |    4000000000 |     205.149s |      51.287ns |      26.394ns
 noop with 20 args                                 |    4000000000 |     396.339s |      99.085ns |      74.191ns
@@ -117,8 +122,9 @@ new string.find with pack/unpack args/retvals     |     403145024 |     480.007s
 async new string.find                             |     514091008 |     480.004s |     933.694ns |     908.801ns
 old string.sub                                    |    1263738880 |     480.004s |     379.828ns |     354.935ns
 new string.sub                                    |    1560678016 |     480.004s |     307.561ns |     282.668ns
-get_faction                                       |      89574000 |     480.008s |    5358.791ns |    5333.897ns
-async get_faction                                 |      69470000 |     480.012s |    6909.629ns |    6884.736ns
+cm:get_faction                                    |      68037000 |     480.040s |    7055.577ns |    7030.684ns
+cm:get_faction no checks                          |      89980000 |     480.009s |    5334.624ns |    5309.731ns
+async cm:get_faction no checks                    |      67957000 |     480.067s |    7064.276ns |    7039.383ns
 -----------------------------------------------------------------------------------------------------------------
 ]]
 local function setup_benchmarks()
@@ -131,8 +137,28 @@ local function setup_benchmarks()
     })
     local noop = function() end
     local passthrough = utils.passthrough
-    suite:add("new table", function()
+    suite:add("new table with 0 items", function()
+        local _ = {}
+    end)
+    suite:add("new table with 2 items", function()
         local _ = {"hello world", "orl"}
+    end)
+    suite:add("new table with 20 items", function()
+        local _ = {"Lorem", "ipsum", "dolor", "sit", "amet", "consectetur", "adipiscing", "elit", "sed", "do", "eiusmod", "tempor", "incididunt", "ut", "labore", "et", "dolore", "magna", "aliqua", "."}
+    end)
+    suite:add("new table with 20 key-values", function()
+        local _ = {Lorem = 1, ipsum = 2, dolor = 3, sit = 4, amet = 5, consectetur = 6, adipiscing = 7, elit = 8, sed = 9, ["do"] = 10,
+            eiusmod = 11, tempor = 12, incididunt = 13, ut = 14, labore = 15, et = 16, dolore = 17, magna = 18, aliqua = 19, ["."] = 20}
+    end)
+    suite:add("pass/access 20 param access", function(t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t17, t18, t19, t20)
+        return t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t17, t18, t19, t20
+    end, function(func)
+        func("Lorem", "ipsum", "dolor", "sit", "amet", "consectetur", "adipiscing", "elit", "sed", "do", "eiusmod", "tempor", "incididunt", "ut", "labore", "et", "dolore", "magna", "aliqua", ".")
+    end)
+    suite:add("pass/access list param with 20 items", function(t)
+        return t[1], t[2], t[3], t[4], t[5], t[6], t[7], t[8], t[9], t[10], t[11], t[12], t[13], t[14], t[15], t[16], t[17], t[18], t[19], t[20]
+    end, function(func)
+        func({"Lorem", "ipsum", "dolor", "sit", "amet", "consectetur", "adipiscing", "elit", "sed", "do", "eiusmod", "tempor", "incididunt", "ut", "labore", "et", "dolore", "magna", "aliqua", "."})
     end)
     suite:add("noop with 0 args", function()
         noop()
@@ -213,10 +239,13 @@ local function setup_benchmarks()
     suite:add("new string.sub", function()
         string.sub("hello world", 3, 8)
     end)
-    suite:add("get_faction", function()
+    suite:add("cm:get_faction", function()
+        cm:get_faction("wh2_main_hef_eataine")
+    end)
+    suite:add("cm:get_faction no checks", function()
         cm:model():world():faction_by_key("wh2_main_hef_eataine")
     end)
-    suite:add("async get_faction", function()
+    suite:add("async cm:get_faction no checks", function()
         cm:model():world():faction_by_key("wh2_main_hef_eataine") -- game object functions are yielded to the async trampoline, so has overhead costs
     end, async)
     return suite
