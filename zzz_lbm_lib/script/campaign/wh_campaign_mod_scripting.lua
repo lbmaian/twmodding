@@ -123,9 +123,12 @@ function load_mod_script(current_file)
 		-- Make sure the file is set as loaded
 		package.loaded[current_file] = true;
 		-- Execute the loaded Lua chunk so the functions within are registered
-		-- LBM CUSTOM START: pass the script name as argument to the script being loaded, so that that script can access it via `...`, and assign return value (or true, if it's nil/false) to package.loaded
+		-- LBM CUSTOM START: pass the script name as argument to the script being loaded, so that that script can access it via `...`, and assign non-nil return value to package.loaded
 		--loaded_file();
-		package.loaded[current_file] = loaded_file(current_file) or true;
+		local ret_val = loaded_file(current_file);
+		if ret_val ~= nil then
+			package.loaded[current_file] = ret_val;
+		end;
 		-- LBM CUSTOM END
 		-- Add this to list of loaded mod scripts
 		table.insert(mod_script_files, current_file);
@@ -158,9 +161,12 @@ function campaign_manager:load_global_script(scriptname, single_player_only)
 		
 		setfenv(file, self.env);
 		package.loaded[scriptname] = true;
-		-- LBM CUSTOM START: pass the script name as argument to the script being loaded, so that that script can access it via `...`, and assign return value (or true, if it's nil/false) to package.loaded
+		-- LBM CUSTOM START: pass the script name as argument to the script being loaded, so that that script can access it via `...`, and assign non-nil return value to package.loaded
 		--file();
-		package.loaded[scriptname] = file(scriptname) or true;
+		local ret_val = file(scriptname);
+		if ret_val ~= nil then
+			package.loaded[scriptname] = ret_val;
+		end;
 		-- LBM CUSTOM END
 		
 		out.dec_tab();
