@@ -123,12 +123,9 @@ function load_mod_script(current_file)
 		-- Make sure the file is set as loaded
 		package.loaded[current_file] = true;
 		-- Execute the loaded Lua chunk so the functions within are registered
-		-- LBM CUSTOM START: pass the script name as argument to the script being loaded, so that that script can access it via `...`, and assign non-nil/false return value to package.loaded
+		-- LBM CUSTOM START: pass the script name as argument to the script being loaded, so that that script can access it via `...`, and assign return value (or true, if it's nil/false) to package.loaded
 		--loaded_file();
-		local ret_val = loaded_file(current_file);
-		if ret_val then
-			package.loaded[current_file] = ret_val;
-		end;
+		package.loaded[current_file] = loaded_file(current_file) or true;
 		-- LBM CUSTOM END
 		-- Add this to list of loaded mod scripts
 		table.insert(mod_script_files, current_file);
@@ -149,7 +146,10 @@ function campaign_manager:load_global_script(scriptname, single_player_only)
 		-- LBM CUSTOM END
 	end;
 	
-	local file = loadfile(scriptname);
+	-- LBM CUSTOM START: treat scriptname as a package name (which uses dots as separators) to a file name (which uses slashes as separators)
+	--local file = loadfile(scriptname);
+	local file = loadfile(string.gsub(scriptname, "%.", "/"));
+	-- LBM CUSTOM END
 	
 	if file then
 		-- the file has been loaded correctly - set its environment, record that it's been loaded, then execute it
@@ -158,12 +158,9 @@ function campaign_manager:load_global_script(scriptname, single_player_only)
 		
 		setfenv(file, self.env);
 		package.loaded[scriptname] = true;
-		-- LBM CUSTOM START: pass the script name as argument to the script being loaded, so that that script can access it via `...`, and assign non-nil/false return value to package.loaded
+		-- LBM CUSTOM START: pass the script name as argument to the script being loaded, so that that script can access it via `...`, and assign return value (or true, if it's nil/false) to package.loaded
 		--file();
-		local ret_val = file(scriptname);
-		if ret_val then
-			package.loaded[scriptname] = ret_val;
-		end;
+		package.loaded[scriptname] = file(scriptname) or true;
 		-- LBM CUSTOM END
 		
 		out.dec_tab();
