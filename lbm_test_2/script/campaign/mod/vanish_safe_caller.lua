@@ -1,1 +1,0 @@
-../../../../zzz_lbm_lib/script/campaign/mod/vanish_safe_caller.lua

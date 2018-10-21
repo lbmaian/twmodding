@@ -11,7 +11,7 @@
 -- the async operation-specified delay until the next async operation, and so forth, until the async block is finished.
 -- To immediately defer execution at the start of an async block (instead of at the first async operation), just use async.sleep(0) as the first statement of the async block.
 
-local utils = cm:load_global_script "lbm_utils"
+local utils = cm:load_global_script "lib.lbm_utils"
 
 local async = {}
 

@@ -5,7 +5,7 @@
 -- Internally, all event listeners for a particular event name are done in an event handler, while all script timers are done in a TimeTrigger event listener.
 
 -- Note: Only including lbm_utils for the new methods it adds to table et al, rather than functions on lbm_utils itself.
-cm:load_global_script "lbm_utils"
+cm:load_global_script "lib.lbm_utils"
 
 local events_tracker = {
     logging_level = 0,

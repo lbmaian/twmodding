@@ -1,10 +1,10 @@
 --luacheck:no unused
 
-local safe_caller = cm:load_global_script "vanish_safe_caller"
+local safe_caller = cm:load_global_script "lib.vanish_safe_caller"
 safe_caller.enable()
 
-local utils = cm:load_global_script "lbm_utils"
-local events_tracker = cm:load_global_script "lbm_events_tracker"
+local utils = cm:load_global_script "lib.lbm_utils"
+local events_tracker = cm:load_global_script "lib.lbm_events_tracker"
 
 core:add_listener(
     "UnitCountBasedUpkeepShortcutTriggeredF9",
@@ -22,7 +22,7 @@ core:add_listener(
     true
 )
 
-local async = cm:load_global_script "lbm_async"
+local async = cm:load_global_script "lib.lbm_async"
 
 core:add_listener(
     "UnitCountBasedUpkeepShortCutTriggeredF10",
@@ -89,7 +89,7 @@ core:add_listener(
     true
 )
 
-local benchmarking = cm:load_global_script "lbm_benchmarking"
+local benchmarking = cm:load_global_script "lib.lbm_benchmarking"
 
 --[[
 Given max_time of 120, max_iters of 1000000000, and 4 total suite runs, on my machine, I get the following benchmark results:
@@ -103,7 +103,7 @@ new table with 0 items                            |    2155362048 |     480.004s
 new table with 2 items                            |    1744903936 |     480.005s |     275.090ns |     250.197ns
 new table with 20 items                           |     799800000 |     480.008s |     600.160ns |     575.267ns
 new table with 20 key-values                      |     372769024 |     480.010s |    1287.687ns |    1262.794ns
-pass/access 20 param access                       |    4000000000 |     341.598s |      85.400ns |      60.507ns
+pass/access 20 param                              |    4000000000 |     341.598s |      85.400ns |      60.507ns
 pass/access list param with 20 items              |    2478748928 |     480.004s |     193.648ns |     168.755ns
 noop with 0 args                                  |    4000000000 |     205.769s |      51.442ns |      26.549ns
 noop with 2 args                                  |    4000000000 |     205.149s |      51.287ns |      26.394ns
@@ -150,7 +150,7 @@ local function setup_benchmarks()
         local _ = {Lorem = 1, ipsum = 2, dolor = 3, sit = 4, amet = 5, consectetur = 6, adipiscing = 7, elit = 8, sed = 9, ["do"] = 10,
             eiusmod = 11, tempor = 12, incididunt = 13, ut = 14, labore = 15, et = 16, dolore = 17, magna = 18, aliqua = 19, ["."] = 20}
     end)
-    suite:add("pass/access 20 param access", function(t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t17, t18, t19, t20)
+    suite:add("pass/access 20 param", function(t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t17, t18, t19, t20)
         return t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t17, t18, t19, t20
     end, function(func)
         func("Lorem", "ipsum", "dolor", "sit", "amet", "consectetur", "adipiscing", "elit", "sed", "do", "eiusmod", "tempor", "incididunt", "ut", "labore", "et", "dolore", "magna", "aliqua", ".")
@@ -366,7 +366,7 @@ local upkeep_effect_bundle_prefix = army_count_prefix .. "upkeep_"
 local dummy_upkeep_effect_bundle = upkeep_effect_bundle_prefix .. "dummy"
 local orig_upkeep_effect_bundle_prefix = "wh_main_bundle_force_additional_army_upkeep_"
 
-local custom_ui_listeners = cm:load_global_script "lbm_custom_ui_listeners"
+local custom_ui_listeners = cm:load_global_script "lib.lbm_custom_ui_listeners"
 
 core:add_listener(
     "UnitCountBasedUpkeepComponentLClickUpDebug",
