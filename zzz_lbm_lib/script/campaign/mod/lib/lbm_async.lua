@@ -23,7 +23,7 @@ local coroutine_to_async_entry_id = {}
 
 local function new_async_entry(func)
     local id = 1
-    while async_entries[id] ~= nil do
+    while async_entries[id] do
         id = id + 1
     end
     local co = coroutine.create(func)
@@ -214,15 +214,15 @@ function async.resume(id)
     end -- else, do nothing, since we're already inside an async block.
 end
 
-local function schedule_async_callback_and_yield(id, delay)
+local function schedule_async_callback_and_yield(id, delay, ...)
     local async_entry = async_entries[id]
     async_entry.next_trigger_time = os.clock() + delay
     --out("schedule_async_callback_and_yield: coroutine " .. tostring(coroutine.running()) .. " @ " .. tostring(async_entry.next_trigger_time) .. " before yielding")
     -- Return control to main coroutine while waiting for an earlier CampaignUI.TriggerCampaignScriptEvent to ultimately trigger.
-    coroutine.yield()
+    return coroutine.yield(...)
 end
 
-function async.retry(callback, max_tries, base_delay, exponential_backoff, callback_name, success_callback, exhaust_tries_callback, enable_logging)
+function async.retry(callback, max_tries, base_delay, exponential_backoff, callback_name, enable_logging)
     if type(callback) == "table" then
         local settings = callback
         callback = settings.callback
@@ -230,19 +230,23 @@ function async.retry(callback, max_tries, base_delay, exponential_backoff, callb
         base_delay = settings.base_delay
         exponential_backoff = settings.exponential_backoff
         callback_name = settings.callback_name
-        success_callback = settings.success_callback
-        exhaust_tries_callback = settings.exhaust_tries_callback
         enable_logging = settings.enable_logging
     end
-    exponential_backoff = exponential_backoff or 1.0
     
     local id = async.id()
     if id == nil then
         error("async.retry must be run in within an async block")
     end
-    
     if max_tries <= 0 then
         error("max_tries (" .. max_tries .. ") must be > 0")
+    end
+    if base_delay < 0 then
+        error("base_delay (" .. base_delay .. ") must be >= 0")
+    end
+    if exponential_backoff == nil then
+        exponential_backoff = 1.0
+    elseif exponential_backoff < 0 then
+        error("exponential_backoff (" .. exponential_backoff .. ") must be > 0")
     end
     
     if enable_logging then
@@ -252,36 +256,35 @@ function async.retry(callback, max_tries, base_delay, exponential_backoff, callb
             base_delay = base_delay,
             exponential_backoff = exponential_backoff,
             callback_name = callback_name,
-            success_callback = success_callback,
-            exhaust_tries_callback = exhaust_tries_callback,
         }))
     end
     
+    local remaining_tries = max_tries
     local delay = base_delay
     local succeeded, value
     repeat
-        succeeded, value = pcall(callback)
+        if enable_logging then
+            out("async.retry[async block " .. id .. "]" .. utils.serialize({try_count = max_tries - remaining_tries + 1, remaining_tries = remaining_tries, delay = delay}))
+        end
+        remaining_tries = remaining_tries - 1
+        succeeded, value = pcall(callback, max_tries - remaining_tries)
         if succeeded then
             break
         end
-        max_tries = max_tries - 1
-        if max_tries == 0 then
+        if remaining_tries == 0 then
             if enable_logging then
-                out("async.retry[async block " .. id .. "] => succeeded=false, max_tries=" .. max_tries .. ", error=" .. value .. debug.traceback("", 2))
+                out("async.retry[async block " .. id .. "] => succeeded=false, remaining_tries=0, error=" .. value .. debug.traceback("", 2))
             end
             error(value)
         else
             if enable_logging then
-                out("async.retry[async block " .. id .. "] => succeeded=false, max_tries=" .. max_tries .. ", error=" .. value .. debug.traceback("", 2))
+                out("async.retry[async block " .. id .. "] => succeeded=false, remaining_tries=" .. remaining_tries .. ", error=" .. value .. debug.traceback("", 2))
             else
-                out("retrying up to " .. max_tries .. " more times after error: " .. value .. debug.traceback("", 2))
+                out("retrying in " .. delay .. " seconds, up to " .. remaining_tries .. " more times after error: " .. value .. debug.traceback("", 2))
             end
         end
         schedule_async_callback_and_yield(id, delay)
         delay = delay * exponential_backoff
-        if enable_logging then
-            out("async.retry[async block " .. id .. "]" .. utils.serialize({max_tries = max_tries, delay = delay}))
-        end
     until succeeded
     if enable_logging then
         out("async.retry[async block " .. id .. "] => succeeded=true, value=" .. utils.serialize(value))

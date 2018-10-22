@@ -12,7 +12,11 @@ function utils.import(module)
     end
 end
 
--- Simply returns its given arguments. Can be used as a near-noop callback function.
+-- Noop function, intended for use as functional argument.
+function utils.noop()
+end
+
+-- Simply returns its given arguments. Can be used as a near-noop callback function. Slightly more expensive than utils.noop due to '...' argument handling.
 function utils.passthrough(...)
     return ...
 end
@@ -323,9 +327,106 @@ end
 -- TW:WH utility functions --
 ---------------------------------------------------------------------
 
+-- map of callback names (and numeric ids when callback name is nil) to {
+--  key = <map key>,
+--  callback_name = <callback name or "retry_callback_<id>",
+--  remaining_tries = <# of tries left>,
+--  delay = <delay until next try in seconds>,
+--  settings = <settings table>,
+-- }
+local retry_entries = {}
+
+local function retry(retry_entry)
+    local key = retry_entry.key
+    local remaining_tries = retry_entry.remaining_tries
+    local delay = retry_entry.delay
+    local settings = retry_entry.settings
+    local enable_logging = settings.enable_logging
+    if enable_logging then
+        out("retry_callback[callback " .. key .. "]" .. utils.serialize({
+            try_count = settings.max_tries - remaining_tries + 1,
+            remaining_tries = remaining_tries,
+            delay = delay,
+        }))
+    end
+    
+    remaining_tries = remaining_tries - 1
+    local succeeded, value = pcall(settings.callback, settings.max_tries - remaining_tries)
+    if succeeded then
+        if enable_logging then
+            out("retry_callback[callback " .. key .. "] => succeeded=true, value=" .. utils.serialize(value))
+        end
+        retry_entries[key] = nil
+        settings.success_callback(value)
+        return
+    end
+    
+    if remaining_tries == 0 then
+        if enable_logging then
+            out("retry_callback[callback " .. key .. "] => succeeded=false, remaining_tries=0, error=" .. value .. debug.traceback("", 3))
+        end
+        retry_entries[key] = nil
+        settings.exhaust_tries_callback(value)
+        return
+    else
+        if enable_logging then
+            out("retry_callback[callback " .. key .. "] => succeeded=false, remaining_tries=" .. remaining_tries .. ", error=" .. value .. debug.traceback("", 3))
+        else
+            out("retrying in " .. delay .. " seconds, up to " .. remaining_tries .. " more times after error: " .. value .. debug.traceback("", 3))
+        end
+    end
+    
+    retry_entry.remaining_tries = remaining_tries
+    retry_entry.delay = delay * settings.exponential_backoff
+    if delay == 0 then
+        -- If delay was 0, we still want to "yield" control to the next event handler/listener or script.
+        -- At the same time, we still want to callback ASAP after such events, and the fastest way to do so is via UITriggerScriptEvent,
+        -- which when triggered, (always?) fires the event before a callback via cm:callback(callback, 0) is called due to the effective ~0.1 minimum delay of the latter.
+        -- See UITriggerScriptEvent:retry_callback event listener below.
+        CampaignUI.TriggerCampaignScriptEvent(nil, "retry_callback" .. string.char(31) .. key)
+    else
+        cm:callback(function()
+            -- Check that the retry entry still exists, since it may have been somehow canceled yet the callback still runs.
+            local next_retry_entry = retry_entries[key]
+            if next_retry_entry then
+                retry(next_retry_entry)
+            end
+        end, delay, retry_entry.callback_name)
+    end
+end
+
+local retry_uitrigger_listener_registered = false
+local function register_retry_uitrigger_listener_if_necessary()
+    if retry_uitrigger_listener_registered then
+        return
+    end
+    retry_uitrigger_listener_registered = true
+    core:add_listener(
+        "UITriggerScriptEvent:retry_callback",
+        "UITriggerScriptEvent",
+        function(context)
+            return context:trigger():starts_with("retry_callback" .. string.char(31))
+        end,
+        function(context)
+            local key = tonumber(context:trigger():sub(string.len("retry_callback") + 1 + 1))
+            local retry_entry = retry_entries[key]
+            if retry_entry then
+                if retry_entry.delay == -1 then -- signal for canceling
+                    retry_entries[key] = nil
+                else
+                    retry(retry_entry)
+                end
+            end
+        end,
+        true
+    )
+end
+
 -- Retries given callback until either given max tries or callback does not error or given max tries, with a given (re)try delay in secs and with an optional exponential backoff.
+-- The callback is called with a single argument: try count, starting from 1.
 -- If the callback does not error before max tries, calls the given success_callback with the first callback's return value.
 -- If the callback keeps erroring by max tries, calls the given exhaust_tries_callback with no argument.
+-- Any existing retries/callbacks for the same callback name are canceled before retrying.
 -- Inputs can be passed to this function in one of two ways:
 -- a) As standard sequential function parameters as shown in the function signature:
 --    callback, max_tries, base_delay, exponential_backoff, callback_name, success_callback, exhaust_tries_callback, enable_logging
@@ -333,70 +434,89 @@ end
 -- The following parameters can be omitted (or passes as nil):
 -- * exponential_backoff (defaults to 1.0)
 -- * callback_name (defaults to nil)
--- * success_callback (defaults to noop)
--- * exhaust_tries_callback (defaults to noop)
+-- * success_callback (defaults to utils.noop)
+-- * exhaust_tries_callback (defaults to error)
 -- * enable_logging (defaults to false)
+-- Immediately returns the callback name (or numeric id if callback name is nil) that can be used to cancel if it desired (via utils.cancel_retries).
 function utils.retry_callback(callback, max_tries, base_delay, exponential_backoff, callback_name, success_callback, exhaust_tries_callback, enable_logging)
-    if type(callback) == "table" then
-        local settings = callback
-        callback = settings.callback
-        max_tries = settings.max_tries
-        base_delay = settings.base_delay
-        exponential_backoff = settings.exponential_backoff
-        callback_name = settings.callback_name
-        success_callback = settings.success_callback
-        exhaust_tries_callback = settings.exhaust_tries_callback
-        enable_logging = settings.enable_logging
-    end
-    exponential_backoff = exponential_backoff or 1.0
-    
-    if max_tries <= 0 then
-        error("max_tries (" .. max_tries .. ") must be > 0")
+    local settings = callback
+    if type(callback) ~= "table" then
+        settings = {
+            callback = settings.callback,
+            max_tries = settings.max_tries,
+            base_delay = settings.base_delay,
+            exponential_backoff = settings.exponential_backoff,
+            callback_name = settings.callback_name,
+            success_callback = settings.success_callback,
+            exhaust_tries_callback = settings.exhaust_tries_callback,
+            enable_logging = settings.enable_logging,
+        }
     end
     
-    if enable_logging then
-        out("retry_callback" .. utils.serialize({
-            callback = callback,
-            max_tries = max_tries,
-            base_delay = base_delay,
-            exponential_backoff = exponential_backoff,
-            callback_name = callback_name,
-            success_callback = success_callback,
-            exhaust_tries_callback = exhaust_tries_callback,
-        }))
+    if settings.max_tries <= 0 then
+        error("max_tries (" .. settings.max_tries .. ") must be > 0")
     end
-    
-    local succeeded, value = pcall(callback)
-    if succeeded then
-        if enable_logging then
-            out("retry_callback => succeeded=true, value=" .. utils.serialize(value))
-        end
-        if success_callback then
-            success_callback(value)
-        end
-        return
+    if settings.base_delay < 0 then
+        error("base_delay (" .. settings.base_delay .. ") must be >= 0")
     end
+    if settings.exponential_backoff == nil then
+        settings.exponential_backoff = 1.0
+    elseif settings.exponential_backoff < 0 then
+        error("exponential_backoff (" .. settings.exponential_backoff .. ") must be > 0")
+    end
+    settings.success_callback = settings.success_callback or utils.noop
+    settings.exhaust_tries_callback = settings.exhaust_tries_callback or error
     
-    max_tries = max_tries - 1
-    if max_tries == 0 then
-        if enable_logging then
-            out("retry_callback => succeeded=false, max_tries=" .. max_tries .. ", error=" .. value .. debug.traceback("", 2))
+    register_retry_uitrigger_listener_if_necessary()
+    
+    local key = callback_name
+    if callback_name then
+        -- Cancel existing callback if same name.
+        local retry_entry = retry_entries[callback_name]
+        if retry_entry and retry_entry.delay > 0 then
+            cm:remove_callback(callback_name)
         end
-        if exhaust_tries_callback then
-            exhaust_tries_callback(value)
-        end
-        return
     else
-        if enable_logging then
-            out("retry_callback => succeeded=false, max_tries=" .. max_tries .. ", error=" .. value .. debug.traceback("", 2))
-        else
-            out("retrying up to " .. max_tries .. " more times after error: " .. value .. debug.traceback("", 2))
+        -- Find the next available id, and autogen a callback name based off it.
+        key = 1
+        while retry_entries[key] do
+            key = key + 1
         end
+        callback_name = "retry_callback_" .. key
+    end
+    local retry_entry = {
+        key = key,
+        callback_name = callback_name,
+        remaining_tries = settings.max_tries,
+        delay = settings.base_delay,
+        settings = settings,
+    }
+    retry_entries[key] = retry_entry
+    
+    if settings.enable_logging then
+        out("retry_callback[callback " .. key .. "]" .. utils.serialize(settings))
     end
     
-    cm:callback(function()
-        utils.retry_callback(callback, max_tries, base_delay * exponential_backoff, exponential_backoff, callback_name, success_callback, exhaust_tries_callback)
-    end, base_delay, callback_name)
+    retry(retry_entry)
+    
+    return key
+end
+
+function utils.cancel_retries(callback_name_or_id)
+    local retry_entry = retry_entries[callback_name_or_id]
+    if not retry_entry then
+        return
+    end
+    if retry_entry.settings.enable_logging then
+        out("retry_callback[callback " .. callback_name_or_id .. "] canceled")
+    end
+    if retry_entry.delay == 0 then
+        -- Since there's no direct way to cancel a UITriggerScriptEvent, need to set a signal so that tells it to do nothing except clean up the entry.
+        retry_entry.delay = -1
+    else
+        retry_entries[callback_name_or_id] = nil
+        cm:remove_callback(retry_entry.callback_name)
+    end
 end
 
 -- Adds a UITriggerScriptEvent event listener that conditions on the given CQI (typically faction CQI, can be nil) and event name

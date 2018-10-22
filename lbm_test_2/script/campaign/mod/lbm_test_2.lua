@@ -23,6 +23,13 @@ core:add_listener(
 
 local async = cm:load_global_script "lib.lbm_async"
 
+utils.add_custom_ui_event_listener("myevent",
+    function(cqi, i)
+        out("myevent fired " .. i)
+    end,
+    true
+)
+
 core:add_listener(
     "UnitCountBasedUpkeepShortCutTriggeredF10",
     "ShortcutTriggered",
@@ -32,12 +39,55 @@ core:add_listener(
     function(context)
         out("event listener coroutine: " .. tostring(coroutine.running()))
         
+        cm:callback(function()
+            out("callback fired 1")
+        end, 0)
+        cm:callback(function()
+            out("callback fired 2")
+        end, 0)
+        cm:callback(function()
+            out("callback fired 3")
+        end, 0)
+        utils.trigger_custom_ui_event("myevent", nil, 1)
+        utils.trigger_custom_ui_event("myevent", nil, 2)
+        utils.trigger_custom_ui_event("myevent", nil, 3)
+        utils.retry_callback({
+            callback = function(try_count)
+                error("0.1-delay retry " .. try_count)
+            end,
+            max_tries = 3,
+            base_delay = 0.1,
+            --enable_logging = true,
+        })
+        utils.retry_callback({
+            callback = function(try_count)
+                error("0-delay retry " .. try_count)
+            end,
+            max_tries = 3,
+            base_delay = 0,
+            --enable_logging = true,
+        })
+        utils.cancel_retries(utils.retry_callback({
+            callback = function(try_count)
+                error("CANCELED 0.1-delay retry " .. try_count)
+            end,
+            max_tries = 3,
+            base_delay = 0.1,
+            enable_logging = true,
+        }))
+        utils.cancel_retries(utils.retry_callback({
+            callback = function(try_count)
+                error("CANCELED 0-delay retry " .. try_count)
+            end,
+            max_tries = 3,
+            base_delay = 0,
+            enable_logging = true,
+        }))
+        
         local id = async(function()
             out("inside async coroutine: " .. tostring(coroutine.running()))
-            local try_count = 0
             local val = async.retry({
-                callback = function()
-                    try_count = try_count + 1
+                callback = function(try_count)
                     out("try count: " .. try_count)
                     if try_count < 3 then
                         error(try_count)
@@ -47,7 +97,7 @@ core:add_listener(
                  max_tries = 3,
                  base_delay = 1.0,
                  exponential_backoff = 1.1,
-                 enable_logging = true,
+                 --enable_logging = true,
             })
             out(val)
             
