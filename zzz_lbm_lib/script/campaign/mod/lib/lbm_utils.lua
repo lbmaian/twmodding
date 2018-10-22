@@ -407,14 +407,14 @@ function utils.add_custom_ui_event_listener(event_name, handler, persistent)
         persistent = true
     end
     core:add_listener(
-        "UITriggerScriptEvent_" .. event_name,
+        "UITriggerScriptEvent" .. string.char(31) .. event_name,
         "UITriggerScriptEvent",
         function(context)
             return context:trigger():starts_with(event_name .. string.char(31))
         end,
         function(context)
             local cqi, trigger_str = context:faction_cqi(), context:trigger()
-            out.ui("UITriggerScriptEvent: cqi=" .. tostring(cqi) .. ", trigger=" .. tostring(trigger_str))
+            --out.ui("UITriggerScriptEvent: cqi=" .. tostring(cqi) .. ", trigger=" .. tostring(trigger_str))
             local return_args_str = trigger_str:sub(event_name:len() + 1 + 1) -- looks like e.g. "<event_name>,{key=value}" or "'arg1', 'arg2'"
             handler(cqi, loadstring("return " .. return_args_str)()) -- calls handler with the cqi and all returned args
         end,
@@ -426,7 +426,7 @@ end
 -- that the handler given to add_custom_ui_event_listener() can parse. See add_custom_ui_event_listener() for an example.
 function utils.trigger_custom_ui_event(event_name, cqi, ...)
     local trigger_str = event_name .. string.char(31) .. utils.serialize(...)
-    out.ui("trigger_custom_ui_event: cqi=" .. cqi .. ", trigger=" .. trigger_str)
+    --out.ui("trigger_custom_ui_event: cqi=" .. tostring(cqi) .. ", trigger=" .. trigger_str)
     CampaignUI.TriggerCampaignScriptEvent(cqi, trigger_str)
 end
 

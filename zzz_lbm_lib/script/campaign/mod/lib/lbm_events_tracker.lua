@@ -24,6 +24,14 @@ function events_tracker.enabled()
     return events_tracker.logging_level > 0
 end
 
+local function context_string(context)
+    if type(context.trigger) == "function" then
+        return "trigger => " .. tostring(context:trigger())
+    else
+        return "string => " .. tostring(context.string)
+    end
+end
+
 -- Enables tracking (simple log output) of each event handler and listener being fired.
 -- Optional argument specifies the logging level to enable it. If omitted, defaults to logging level 1.
 -- * Log level 1: Only logs when handlers/listeners/timers fire.
@@ -64,8 +72,8 @@ function events_tracker.enable(logging_level)
         }
         event_handler_records[i] = event_handler_record
         event_handlers[i] = function(context, ...)
-            out("[event] firing " .. event_handler_record.desc .. ": string => " .. tostring(context.string))
-            --out("[event] firing " .. event_handler_record.desc .. ": string => " .. tostring(context.string) .. " - context interface: " .. tostring(getmetatable(context)))
+            out("[event] firing " .. event_handler_record.desc .. ": " .. context_string(context))
+            --out("[event] firing " .. event_handler_record.desc .. ": " .. context_string(context) .. " - context interface: " .. tostring(getmetatable(context)))
             if event_handler_record.orig_handler then
                 return event_handler_record.orig_handler(context, ...)
             end
@@ -112,17 +120,17 @@ function events_tracker.enable(logging_level)
                 local ret_status, ret_val = pcall(event_listener_record.orig_condition, context, ...)
                 if ret_status then
                     if not ret_val then
-                        out("[event] not firing " .. event_listener_record.desc .. ": condition => " .. tostring(ret_val) .. "; string => " .. tostring(context.string))
+                        out("[event] not firing " .. event_listener_record.desc .. ": condition => " .. tostring(ret_val) .. "; " .. context_string(context))
                     end
                     return ret_val
                 else
-                    out("[event] not firing " .. event_listener_record.desc .. ": condition => ERROR: " .. tostring(ret_val) .. "; string => " .. tostring(context.string))
+                    out("[event] not firing " .. event_listener_record.desc .. ": condition => ERROR: " .. tostring(ret_val) .. "; " .. context_string(context))
                     error(ret_val)
                 end
             end
         end
         event_listener.callback = function(context, ...)
-            out("[event] firing " .. event_listener_record.desc .. ": string => " .. tostring(context.string))
+            out("[event] firing " .. event_listener_record.desc .. ": " .. context_string(context))
             return event_listener_record.orig_callback(context, ...)
         end
         if cur_logging_level >= req_logging_level then
