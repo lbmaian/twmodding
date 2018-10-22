@@ -327,14 +327,16 @@ end
 -- If the callback does not error before max tries, calls the given success_callback with the first callback's return value.
 -- If the callback keeps erroring by max tries, calls the given exhaust_tries_callback with no argument.
 -- Inputs can be passed to this function in one of two ways:
--- a) As standard sequential function parameters as shown in the function signature: callback, max_tries, base_delay, exponential_backoff, callback_name, success_callback, exhaust_tries_callback.
+-- a) As standard sequential function parameters as shown in the function signature:
+--    callback, max_tries, base_delay, exponential_backoff, callback_name, success_callback, exhaust_tries_callback, enable_logging
 -- b) As a single settings table where each key corresponds to a parameter in the function signature (e.g. max_tries) and the value is the input for that parameter.
 -- The following parameters can be omitted (or passes as nil):
 -- * exponential_backoff (defaults to 1.0)
 -- * callback_name (defaults to nil)
 -- * success_callback (defaults to noop)
--- * exhaust_tries_callback (defaults to noop).
-function utils.retry_callback(callback, max_tries, base_delay, exponential_backoff, callback_name, success_callback, exhaust_tries_callback)
+-- * exhaust_tries_callback (defaults to noop)
+-- * enable_logging (defaults to false)
+function utils.retry_callback(callback, max_tries, base_delay, exponential_backoff, callback_name, success_callback, exhaust_tries_callback, enable_logging)
     if type(callback) == "table" then
         local settings = callback
         callback = settings.callback
@@ -344,6 +346,7 @@ function utils.retry_callback(callback, max_tries, base_delay, exponential_backo
         callback_name = settings.callback_name
         success_callback = settings.success_callback
         exhaust_tries_callback = settings.exhaust_tries_callback
+        enable_logging = settings.enable_logging
     end
     exponential_backoff = exponential_backoff or 1.0
     
@@ -351,19 +354,23 @@ function utils.retry_callback(callback, max_tries, base_delay, exponential_backo
         error("max_tries (" .. max_tries .. ") must be > 0")
     end
     
-    out("retry_callback" .. utils.serialize({
-        callback = callback,
-        max_tries = max_tries,
-        base_delay = base_delay,
-        exponential_backoff = exponential_backoff,
-        callback_name = callback_name,
-        success_callback = success_callback,
-        exhaust_tries_callback = exhaust_tries_callback,
-    }))
+    if enable_logging then
+        out("retry_callback" .. utils.serialize({
+            callback = callback,
+            max_tries = max_tries,
+            base_delay = base_delay,
+            exponential_backoff = exponential_backoff,
+            callback_name = callback_name,
+            success_callback = success_callback,
+            exhaust_tries_callback = exhaust_tries_callback,
+        }))
+    end
     
     local succeeded, value = pcall(callback)
-    out("=> succeeded=" .. tostring(succeeded) .. ", value=" .. utils.serialize(value))
     if succeeded then
+        if enable_logging then
+            out("retry_callback => succeeded=true, value=" .. utils.serialize(value))
+        end
         if success_callback then
             success_callback(value)
         end
@@ -372,10 +379,19 @@ function utils.retry_callback(callback, max_tries, base_delay, exponential_backo
     
     max_tries = max_tries - 1
     if max_tries == 0 then
+        if enable_logging then
+            out("retry_callback => succeeded=false, max_tries=" .. max_tries .. ", error=" .. value .. debug.traceback("", 2))
+        end
         if exhaust_tries_callback then
             exhaust_tries_callback(value)
         end
         return
+    else
+        if enable_logging then
+            out("retry_callback => succeeded=false, max_tries=" .. max_tries .. ", error=" .. value .. debug.traceback("", 2))
+        else
+            out("retrying up to " .. max_tries .. " more times after error: " .. value .. debug.traceback("", 2))
+        end
     end
     
     cm:callback(function()

@@ -32,17 +32,23 @@ core:add_listener(
     function(context)
         out("event listener coroutine: " .. tostring(coroutine.running()))
         
-        async(function()
+        local id = async(function()
             out("inside async coroutine: " .. tostring(coroutine.running()))
             local try_count = 0
-            local val = async.retry(function()
-                try_count = try_count + 1
-                out("try count: " .. try_count)
-                if try_count < 3 then
-                    error(try_count)
-                end
-                return "inner done"
-            end, 3, 1.0)
+            local val = async.retry({
+                callback = function()
+                    try_count = try_count + 1
+                    out("try count: " .. try_count)
+                    if try_count < 3 then
+                        error(try_count)
+                    end
+                    return "inner done"
+                end,
+                 max_tries = 3,
+                 base_delay = 1.0,
+                 exponential_backoff = 1.1,
+                 enable_logging = true,
+            })
             out(val)
             
             async.sleep(2.5)
@@ -73,6 +79,14 @@ core:add_listener(
             local localised_str = effect.get_localised_string("ui_text_replacements_localised_text_tooltip_lbm_additional_army_unit_count_upkeep_num_units")
             out(tostring(localised_str))
             
+            async(function()
+                out("inside nested async coroutine: " .. tostring(coroutine.running()))
+                async.sleep(0, true)
+                out("inside nested async foo")
+                async.sleep(2, true)
+                out("inside nested async bar")
+            end)
+            
             out(utils.serialize(string.find("hi world", "or")))
             out(utils.serialize(string.find("hi world", "foo")))
             out(utils.serialize(string.find("hi world", "")))
@@ -82,6 +96,7 @@ core:add_listener(
             end, 3, 1.0)
             out(val)
         end)
+        async.resume(id) -- start it immediately, instead of after this listener finishes
         
         out("event listener done")
     end,

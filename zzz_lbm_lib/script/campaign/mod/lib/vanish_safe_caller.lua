@@ -1,5 +1,5 @@
 --Vanish's PCaller
---All credits to vanish (with some minor scaffolding by lbm)
+--All credits to vanish (with some minor scaffolding and tweaks by lbm)
 --cm:load_global_script "lib.vanish_safe_caller" to enable. Ensure this is called early, since this only affects script-triggered event handlers, CM callbacks, and new event listeners.
 
 --v function(func: function) --> any
@@ -8,7 +8,7 @@ local function safeCall(func)
     if not status then
         out("LUA ERROR DETECTED")
         out(tostring(result))
-        out(debug.traceback())
+        out(debug.traceback("", 2))
     end
     
     return result

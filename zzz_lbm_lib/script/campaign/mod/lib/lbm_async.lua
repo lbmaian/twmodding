@@ -1,5 +1,6 @@
 -- Enables asynchronous programming to avoid callback hell
 -- WARNING: EXPERIMENTAL PROOF OF CONCEPT THAT MAY HAVE POOR PERFORMANCE
+-- TODO: docs
 
 -- Typical usage:
 --  local id = async(function()
@@ -7,9 +8,11 @@
 --  end)
 -- Enables async operations (such as async.retry and async.sleep) within the nullary function passed to async (denoted as the async block).
 -- Returns an id that can be used to cancel an ongoing async block at the next opportunity via async.cancel.
--- Execution of the async block proceeds immediately until the first async operation, during which point, it yields control to the main coroutine, resumes execution at approximately
--- the async operation-specified delay until the next async operation, and so forth, until the async block is finished.
--- To immediately defer execution at the start of an async block (instead of at the first async operation), just use async.sleep(0) as the first statement of the async block.
+-- When created, execution of the async block is deferred until after the current event handler/listener or script load is finished
+-- (specifically, when the next UITriggerScriptEvent fires, which async() triggers).
+-- Then execution proceeds until the first async operation, during which point, it yields control to the main coroutine,
+-- resumes execution at approximately the async operation-specified delay until the next async operation, and so forth, until the async block is finished.
+-- To immediately start execution of an async block just created via async(), use async.resume(<async id>).
 
 local utils = cm:load_global_script "lib.lbm_utils"
 
@@ -69,7 +72,7 @@ local function update_game_object_functions(game_object_name, game_object)
     --out.dec_tab()
 end
 
-local function update_all_game_object_functions()
+local function update_all_game_object_functions_if_necessary()
     if all_orig_game_object_functions == nil then
         all_orig_game_object_functions = {}
     end
@@ -163,7 +166,7 @@ local function async_trampoline(id)
     
     local time = os.clock()
     --out("async_trampoline: after main loop: next_trigger_time @ " .. tostring(async_entry.next_trigger_time) .. " vs current time @ " .. tostring(time))
-    local faction_cqi = nil -- faction_cqi can be nil, since we're not using it
+    local cqi = nil -- cqi can be nil, since we're not using it
     if time <= async_entry.next_trigger_time then
         --out("async_trampoline: cm:callback")
         cm:callback(function()
@@ -174,7 +177,7 @@ local function async_trampoline(id)
         --out("async_trampoline: CampaignUI.TriggerCampaignScriptEvent")
         -- Even for an effective delay of 0 secs, trigger our UITriggerScriptEvent event, and return to let other backlogged events to process (in the main coroutine),
         -- before our UITriggerScriptEvent runs and calls this whole function again.
-        CampaignUI.TriggerCampaignScriptEvent(faction_cqi, async_processor_ui_trigger_prefix .. id)
+        CampaignUI.TriggerCampaignScriptEvent(cqi, async_processor_ui_trigger_prefix .. id)
     end
 end
 
@@ -195,58 +198,106 @@ core:add_listener(
 -- async(func)
 setmetatable(async, {
     __call = function(self, func)
-        update_all_game_object_functions()
-        if coroutine_to_async_entry_id[coroutine.running()] ~= nil then
-            -- If we're already in an async, error for now. TODO: allow this case
-            error("Nested async is currently not allowed")
-        else -- we're in the main coroutine
-            local id = new_async_entry(func)
-            async_trampoline(id)
-            return id
-        end
+        update_all_game_object_functions_if_necessary()
+        local id = new_async_entry(func)
+        CampaignUI.TriggerCampaignScriptEvent(nil, async_processor_ui_trigger_prefix .. id)
+        return id
     end
 })
 
-local function schedule_async_callback(id, delay)
+function async.resume(id)
+    local cur_id = async.id()
+    if cur_id == nil then
+        async_trampoline(id)
+    elseif cur_id ~= id then
+        error("Cannot resume an async block (" .. id .. ") inside a currently running async block (" .. cur_id .. ")")
+    end -- else, do nothing, since we're already inside an async block.
+end
+
+local function schedule_async_callback_and_yield(id, delay)
     local async_entry = async_entries[id]
     async_entry.next_trigger_time = os.clock() + delay
-    --out("schedule_async_callback: coroutine " .. tostring(coroutine.running()) .. " @ " .. tostring(async_entry.next_trigger_time) .. " before yielding")
+    --out("schedule_async_callback_and_yield: coroutine " .. tostring(coroutine.running()) .. " @ " .. tostring(async_entry.next_trigger_time) .. " before yielding")
     -- Return control to main coroutine while waiting for an earlier CampaignUI.TriggerCampaignScriptEvent to ultimately trigger.
     coroutine.yield()
 end
 
--- TODO implement rest of utils.retry_callback features
-function async.retry(func, max_tries, delay)
+function async.retry(callback, max_tries, base_delay, exponential_backoff, callback_name, success_callback, exhaust_tries_callback, enable_logging)
+    if type(callback) == "table" then
+        local settings = callback
+        callback = settings.callback
+        max_tries = settings.max_tries
+        base_delay = settings.base_delay
+        exponential_backoff = settings.exponential_backoff
+        callback_name = settings.callback_name
+        success_callback = settings.success_callback
+        exhaust_tries_callback = settings.exhaust_tries_callback
+        enable_logging = settings.enable_logging
+    end
+    exponential_backoff = exponential_backoff or 1.0
+    
     local id = async.id()
     if id == nil then
-        error("async.retry must be run in within a function passed to async")
+        error("async.retry must be run in within an async block")
     end
     
     if max_tries <= 0 then
         error("max_tries (" .. max_tries .. ") must be > 0")
     end
     
-    local status, val
+    if enable_logging then
+        out("async.retry[async block " .. id .. "]" .. utils.serialize({
+            callback = callback,
+            max_tries = max_tries,
+            base_delay = base_delay,
+            exponential_backoff = exponential_backoff,
+            callback_name = callback_name,
+            success_callback = success_callback,
+            exhaust_tries_callback = exhaust_tries_callback,
+        }))
+    end
+    
+    local delay = base_delay
+    local succeeded, value
     repeat
-        status, val = pcall(func)
-        if status then
+        succeeded, value = pcall(callback)
+        if succeeded then
             break
         end
         max_tries = max_tries - 1
         if max_tries == 0 then
-            error(val)
+            if enable_logging then
+                out("async.retry[async block " .. id .. "] => succeeded=false, max_tries=" .. max_tries .. ", error=" .. value .. debug.traceback("", 2))
+            end
+            error(value)
+        else
+            if enable_logging then
+                out("async.retry[async block " .. id .. "] => succeeded=false, max_tries=" .. max_tries .. ", error=" .. value .. debug.traceback("", 2))
+            else
+                out("retrying up to " .. max_tries .. " more times after error: " .. value .. debug.traceback("", 2))
+            end
         end
-        schedule_async_callback(id, delay)
-    until status
-    return val
+        schedule_async_callback_and_yield(id, delay)
+        delay = delay * exponential_backoff
+        if enable_logging then
+            out("async.retry[async block " .. id .. "]" .. utils.serialize({max_tries = max_tries, delay = delay}))
+        end
+    until succeeded
+    if enable_logging then
+        out("async.retry[async block " .. id .. "] => succeeded=true, value=" .. utils.serialize(value))
+    end
+    return value
 end
 
-function async.sleep(delay)
+function async.sleep(delay, enable_logging)
     local id = async.id()
     if id == nil then
-        error("async.callback must be run in within a function passed to async")
+        error("async.callback must be run in within an async block")
     end
-    schedule_async_callback(id, delay)
+    if enable_logging then
+        out("async.sleep[async block " .. id .."](" .. delay ..")")
+    end
+    schedule_async_callback_and_yield(id, delay)
 end
 
 function async.cancel(id)
