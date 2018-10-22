@@ -1,7 +1,6 @@
 --luacheck:no unused
 
-local safe_caller = cm:load_global_script "lib.vanish_safe_caller"
-safe_caller.enable()
+cm:load_global_script "lib.vanish_safe_caller"
 
 local utils = cm:load_global_script "lib.lbm_utils"
 local events_tracker = cm:load_global_script "lib.lbm_events_tracker"
