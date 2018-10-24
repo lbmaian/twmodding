@@ -62,7 +62,7 @@ local function run_benchmark(max_time, max_iters, check_time_every_n_iters, name
     if control_time_per_iter == nil then
         control_time_per_iter = time_per_iter
     end
-    out(string.format("%-50s|%14.0f |%12.3fs |%12.3fns |%12.3fns", -- %d seems bound within 4-byte integer range, so use %.0f instead
+    out(string.format("%-50s|%14.0f |%13.3fs |%12.3fns |%12.3fns", -- %d seems bound within 4-byte integer range, so use %.0f instead
         name, num_iters, time_elapsed, time_per_iter, time_per_iter - control_time_per_iter))
     collectgarbage()
     collectgarbage() -- 2nd collectgarbage finalizes objects used in any gc finalizers
@@ -125,7 +125,7 @@ function benchmarking:aggregate_results(suite_results)
     for _, name in ipairs(names) do
         local aggregate_record = aggregate_records[name]
         local aggregate_time_per_iter = aggregate_record.time_elapsed / aggregate_record.num_iters * 1000000000 -- in nanoseconds
-        out(string.format("%-50s|%14.0f |%12.3fs |%12.3fns |%12.3fns", -- %d seems bound within 4-byte integer range, so use %.0f instead
+        out(string.format("%-50s|%14.0f |%13.3fs |%12.3fns |%12.3fns", -- %d seems bound within 4-byte integer range, so use %.0f instead
             name, aggregate_record.num_iters, aggregate_record.time_elapsed, aggregate_time_per_iter, aggregate_time_per_iter - aggregate_control_time_per_iter))
     end
     out("-----------------------------------------------------------------------------------------------------------------")
