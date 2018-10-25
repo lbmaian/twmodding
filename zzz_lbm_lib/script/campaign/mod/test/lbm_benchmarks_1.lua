@@ -9,6 +9,10 @@ BENCHMARKS AGGREGATE
 NAME                                              | # ITERS       | TIME ELAPSED  | TIME PER ITER | MINUS CONTROL
 -----------------------------------------------------------------------------------------------------------------
 control (only benchmarking overhead)              |    4000000000 |       99.574s |      24.893ns |       0.000ns
+#<string>                                         |    4000000000 |      117.981s |      29.495ns |       4.602ns
+string.len                                        |    4000000000 |      281.124s |      70.281ns |      45.388ns
+(string.)len                                      |    4000000000 |      175.528s |      43.882ns |      18.989ns
+<string>:len                                      |    4000000000 |      251.656s |      62.914ns |      38.021ns
 new table with 0 items                            |    2155362048 |      480.004s |     222.702ns |     197.809ns
 new table with 2 items                            |    1744903936 |      480.005s |     275.090ns |     250.197ns
 new table with 20 items                           |     799800000 |      480.008s |     600.160ns |     575.267ns
@@ -22,8 +26,8 @@ passthrough (near noop) with 0 args               |    4000000000 |      241.035
 passthrough (near noop) with 2 args               |    4000000000 |      240.801s |      60.200ns |      35.307ns
 passthrough (near noop) with 20 args              |    3956001024 |      480.004s |     121.336ns |      96.442ns
 new function                                      |    2426061056 |      480.004s |     197.853ns |     172.960ns
-coroutine empty                                   |    2711382016 |      480.004s |     177.033ns |     152.139ns
-async_trampoline-like coroutine passthrough       |    1335106048 |      480.004s |     359.525ns |     334.632ns
+coroutine empty                                   |    2710658048 |      480.004s |     177.080ns |     152.187ns
+async_trampoline-like coroutine passthrough       |    1173959040 |      480.004s |     408.876ns |     383.983ns
 async.id                                          |    3932091968 |      480.004s |     122.073ns |      97.180ns
 async passthrough                                 |     827916928 |      480.003s |     579.772ns |     554.879ns
 orig string.find                                  |    1359634944 |      480.004s |     353.039ns |     328.145ns
@@ -65,6 +69,19 @@ local function setup_benchmarks()
         async.resume(id)
     end
     
+    suite:add("#<string>", function()
+        return #"hello world"
+    end)
+    suite:add("string.len", function()
+        return string.len("hello world")
+    end)
+    local stringlen = string.len
+    suite:add("(string.)len", function()
+        return stringlen("hello world")
+    end)
+    suite:add("<string>:len", function()
+        return ("hello world"):len()
+    end)
     suite:add("new table with 0 items", function()
         local _ = {}
     end)
@@ -119,8 +136,8 @@ local function setup_benchmarks()
         end)
         return func(co)
     end)
-    suite:add("async_trampoline-like coroutine passthrough", function(co, x)
-        local ret_status, ret_val = coroutine.resume(co, x)
+    suite:add("async_trampoline-like coroutine passthrough", function(co)
+        local ret_status, ret_val, x = coroutine.resume(co, 1)
         if not ret_status then
             error(ret_val)
         elseif type(ret_val) == "function" then
@@ -131,13 +148,14 @@ local function setup_benchmarks()
         if coroutine.status(co) == "dead" then
             return
         end
+        return x
     end, function(func)
         local co = coroutine.create(function()
             while true do
-                coroutine.yield()
+                local _ = coroutine.yield(passthrough, 2)
             end
         end)
-        return func(co, 0)
+        return func(co)
     end)
     suite:add("async.id", function()
         async.id() -- includes a couroutine.running() call
@@ -231,7 +249,7 @@ end
 local function run_benchmarks(num_suite_runs)
     local suite = setup_benchmarks()
     local suite_results = {}
-    for i = 1, num_suite_runs do
+    for _ = 1, num_suite_runs do
         utils.callback_without_performance_monitor(function()
             suite_results[#suite_results + 1] = suite:run_suite()
             if #suite_results == num_suite_runs then

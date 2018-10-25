@@ -408,7 +408,7 @@ local function register_retry_uitrigger_listener_if_necessary()
             return context:trigger():starts_with("retry_callback" .. string.char(31))
         end,
         function(context)
-            local key = tonumber(context:trigger():sub(string.len("retry_callback") + 1 + 1))
+            local key = tonumber(context:trigger():sub(#"retry_callback" + 1 + 1))
             local retry_entry = retry_entries[key]
             if retry_entry then
                 if retry_entry.delay == -1 then -- signal for canceling

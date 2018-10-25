@@ -20,6 +20,7 @@ function lbm_test_1() -- luacheck: no global
 
     local co = coroutine.create(function()
         mylog("inside coroutine")
+        mylog(#"test")
         mylog(string.len("test"))
         mylog(string.upper("test"))
         mylog(string.lower("TesT"))

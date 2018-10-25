@@ -188,7 +188,7 @@ core:add_listener(
         return context:trigger():starts_with(async_processor_ui_trigger_prefix)
     end,
     function(context)
-        local id = tonumber(context:trigger():sub(string.len(async_processor_ui_trigger_prefix) + 1), 10)
+        local id = tonumber(context:trigger():sub(#async_processor_ui_trigger_prefix + 1), 10)
         --out("UITriggerScriptEvent:async_trampoline: id=" .. id)
         async_trampoline(id)
     end,
