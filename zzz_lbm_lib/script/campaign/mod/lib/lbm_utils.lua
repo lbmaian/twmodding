@@ -535,7 +535,7 @@ function utils.add_custom_ui_event_listener(event_name, handler, persistent)
         function(context)
             local cqi, trigger_str = context:faction_cqi(), context:trigger()
             --out.ui("UITriggerScriptEvent: cqi=" .. tostring(cqi) .. ", trigger=" .. tostring(trigger_str))
-            local return_args_str = trigger_str:sub(event_name:len() + 1 + 1) -- looks like e.g. "<event_name>,{key=value}" or "'arg1', 'arg2'"
+            local return_args_str = trigger_str:sub(event_name:len() + 1 + 1) -- looks like e.g. "<event_name>{key=value}" or "<event_name>'arg1','arg2'"
             handler(cqi, loadstring("return " .. return_args_str)()) -- calls handler with the cqi and all returned args
         end,
         persistent
