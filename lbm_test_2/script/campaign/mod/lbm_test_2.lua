@@ -6,7 +6,7 @@ local utils = cm:load_global_script "lib.lbm_utils"
 local events_tracker = cm:load_global_script "lib.lbm_events_tracker"
 
 core:add_listener(
-    "UnitCountBasedUpkeepShortcutTriggeredF9",
+    "ShortcutTriggeredF9LbmTest",
     "ShortcutTriggered",
     function(context)
         return context.string == "camera_bookmark_view0" -- F9 by default
@@ -52,7 +52,7 @@ utils.add_custom_ui_event_listener("myevent",
 )
 
 core:add_listener(
-    "UnitCountBasedUpkeepShortCutTriggeredF10",
+    "ShortCutTriggeredF10LbmTest",
     "ShortcutTriggered",
     function(context)
         return context.string == "camera_bookmark_view1" -- F10 by default
@@ -235,7 +235,7 @@ local function test_create_force()
 end
 
 core:add_listener(
-    "UnitCountBasedUpkeepShortCutTriggeredF11",
+    "ShortCutTriggeredF11LbmTest",
     "ShortcutTriggered",
     function(context)
         return context.string == "camera_bookmark_view2" -- F11 by default
@@ -248,7 +248,7 @@ core:add_listener(
 )
 
 core:add_listener(
-    "UnitCountBasedUpkeepShortCutTriggeredF12",
+    "ShortCutTriggeredF12LbmTest",
     "ShortcutTriggered",
     function(context)
         return context.string == "camera_bookmark_view3" -- F12 by default (note: should change the Steam screenshot shortcut key avoid taking screenshots)
@@ -265,11 +265,11 @@ core:add_listener(
 )
 
 core:add_listener(
-    "RecruitmentItemIssuedByPlayerDebug",
+    "RecruitmentItemIssuedByPlayerLbmTest",
     "RecruitmentItemIssuedByPlayer",
     true,
     function(context)
-        out("RecruitmentItemIssuedByPlayerDebug: " .. context:main_unit_record() .. " in " .. context:time_to_build() .. " turns")
+        out("RecruitmentItemIssuedByPlayerLbmTest: " .. context:main_unit_record() .. " in " .. context:time_to_build() .. " turns")
     end,
     true
 )
@@ -284,7 +284,7 @@ local orig_upkeep_effect_bundle_prefix = "wh_main_bundle_force_additional_army_u
 local custom_ui_listeners = cm:load_global_script "lib.lbm_custom_ui_listeners"
 
 core:add_listener(
-    "UnitCountBasedUpkeepComponentLClickUpDebug",
+    "ComponentLClickUpLbmTest",
     "ComponentLClickUp",
     custom_ui_listeners.enabled,
     function(context)
@@ -328,11 +328,11 @@ core:add_listener(
 -- TEMP DEBUG
 --[=[
 core:add_listener(
-    "UnitCountBasedUpkeepTimeTriggerDebug",
+    "TimeTriggerLbmTest",
     "TimeTrigger",
     true,
     function(context)
-        out("TimeTrigger: " .. tostring(context.string))
+        out("TimeTriggerLbmTest: " .. tostring(context.string))
     end,
     true
 )

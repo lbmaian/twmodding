@@ -32,6 +32,7 @@ end
 end
 
 -- Serializes value(s) into a string that can be evaluated via loadstring. If multiple values are passed, they are each serialized and concatenated with the "," delimiter.
+-- WARNING: Cyclic references will cause an infinite recursion.
 function utils.serialize(...)
     local arg_len = select("#", ...)
     if arg_len == 0 then
@@ -74,7 +75,7 @@ function utils.serialize(...)
             end
         end
         return "{" .. table.concat(str_arr, ",", 1, len) .. "}"
-    else -- unserializable value like function, thread, or userdata - just wrap its tostring value in quotes and angle brackets
+    else -- unserializable value type like function, thread, or userdata - just wrap its tostring value in quotes and angle brackets
         return '"<' .. tostring(val) .. '>"'
     end
 end
