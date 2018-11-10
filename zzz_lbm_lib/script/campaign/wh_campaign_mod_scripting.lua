@@ -43,7 +43,7 @@ function (context)
 		local current_file = mod_script_files[i];
 		
 		-- Make sure there is a function by the same name as the file
-		if local_env[current_file] ~= nil then
+		if type(local_env[current_file]) == "function" then
 			-- If a function by that name does exist then call it
 			local_env[current_file]();
 		end
@@ -62,6 +62,8 @@ function load_mod_scripts(campaign_key)
 			if not ok then
 				ModLog("ERROR : ["..tostring(filename).."]");
 				ModLog("\t"..tostring(err));
+			else
+				ModLog("Loaded Mod: ["..tostring(filename).."]");
 			end
 		end
 	end
@@ -78,6 +80,8 @@ function load_mod_scripts(campaign_key)
 			if not ok then
 				ModLog("ERROR : ["..tostring(filename).."]");
 				ModLog("\t"..tostring(err));
+			else
+				ModLog("Loaded Mod: ["..tostring(filename).."]");
 			end
 		end
 	end
