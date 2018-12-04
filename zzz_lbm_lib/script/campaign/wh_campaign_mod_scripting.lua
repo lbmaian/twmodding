@@ -136,6 +136,11 @@ function load_mod_script(current_file)
 		-- LBM CUSTOM END
 		-- Add this to list of loaded mod scripts
 		table.insert(mod_script_files, current_file);
+	-- LBM CUSTOM START: add handling for when loadfile files (e.g. script syntax error)
+	else
+		-- The file was not loaded correctly, however loadfile doesn't tell us why. Here we try and load it again with require which is more verbose in its raised error message.
+		require(current_file)
+	-- LBM CUSTOM END
 	end
 end
 
