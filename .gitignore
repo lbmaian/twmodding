@@ -43,6 +43,7 @@ luac.out
 /*
 # Whitelist specific directories in root
 !/lbm_test*/
+!/lbm_unit_count_upkeep/
 !/zzz_lbm_lib/
 # Whitelist certain files in root
 !.gitignore
