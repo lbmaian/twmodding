@@ -62,6 +62,10 @@ function load_mod_scripts(campaign_key)
 			if not ok then
 				ModLog("ERROR : ["..tostring(filename).."]");
 				ModLog("\t"..tostring(err));
+			-- LBM CUSTOM START: load_mod_script can return an error string now (used for avoiding loading scripts in mod subfolders)
+			elseif err then
+				ModLog(tostring(err)..": ["..tostring(filename).."]")
+			-- LBM CUSTOM END
 			else
 				ModLog("Loaded Mod: ["..tostring(filename).."]");
 			end
@@ -80,6 +84,10 @@ function load_mod_scripts(campaign_key)
 			if not ok then
 				ModLog("ERROR : ["..tostring(filename).."]");
 				ModLog("\t"..tostring(err));
+			-- LBM CUSTOM START: load_mod_script can return an error string now (used for avoiding loading scripts in mod subfolders)
+			elseif err then
+				ModLog(tostring(err)..": ["..tostring(filename).."]")
+			-- LBM CUSTOM END
 			else
 				ModLog("Loaded Mod: ["..tostring(filename).."]");
 			end
@@ -88,6 +96,8 @@ function load_mod_scripts(campaign_key)
 end
 
 function load_mod_script(current_file)
+	-- LBM CUSTOM START: avoid loading scripts in mod subfolders (this never worked before, and now with the handling of loadfile errors would result in extraneous errors)
+	--[[
 	local pointer = 1;
 	
 	while true do
@@ -102,6 +112,12 @@ function load_mod_script(current_file)
 			break;
 		end
 	end
+	--]]
+	current_file = string.match(current_file, "[\\/]mod[\\/](.+)")
+	if string.find(current_file, "\\") or string.find(current_file, "/") then
+		return "Not automatically loading scripts in a mod subfolder"
+	end
+	-- LBM CUSTOM END
 	
 	local suffix = string.sub(current_file, string.len(current_file) - 3);
 	
@@ -136,7 +152,7 @@ function load_mod_script(current_file)
 		-- LBM CUSTOM END
 		-- Add this to list of loaded mod scripts
 		table.insert(mod_script_files, current_file);
-	-- LBM CUSTOM START: add handling for when loadfile files (e.g. script syntax error)
+	-- LBM CUSTOM START: add handling for when loadfile fails (e.g. script syntax error)
 	else
 		-- The file was not loaded correctly, however loadfile doesn't tell us why. Here we try and load it again with require which is more verbose in its raised error message.
 		require(current_file)
