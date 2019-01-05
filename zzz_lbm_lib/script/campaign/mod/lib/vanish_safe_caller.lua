@@ -2,6 +2,13 @@
 --All credits to vanish (with some minor scaffolding and tweaks by lbm)
 --cm:load_global_script "lib.vanish_safe_caller" to enable. Ensure this is called early, since this only affects script-triggered event handlers, CM callbacks, and new event listeners.
 
+-- If another mod has a safe caller (that typically defines a global safeCall function), assume it'll be used and don't use this version of the safe caller.
+-- This isn't foolproof by any means, since the alternate safe caller can be loaded after this script is loaded and run, but it's better than nothing.
+if safeCall then --luacheck:no global
+    out("Alternate version of Vanish safe caller already enabled")
+    return
+end
+
 --v function(func: function) --> any
 local function safeCall(func)
     local status, result = pcall(func)
