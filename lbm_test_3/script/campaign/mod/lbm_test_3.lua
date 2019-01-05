@@ -142,7 +142,7 @@ function lbm_test_3() --luacheck:no global
             out("F9: ...")
             local faction = cm:get_faction(cm:get_local_faction(true))
             output_faction_forces(faction)
-            os.execute("CHOICE /n /d:y /c:yn /t:9999")
+            os.execute("CHOICE /n /d:y /c:yn /t:9999") -- hacky way to completely pause the game
         end,
         true
     )

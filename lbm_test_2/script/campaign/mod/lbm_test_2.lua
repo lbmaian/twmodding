@@ -1,7 +1,8 @@
 --luacheck:no unused
 
+-- Note: require/loadfile seems finicky since it doesn't seem guaranteed that the same global environment is always used (might be scripts being loaded from different threads?)
+-- so using cm:load_global_script, which ensures the same global environment is used, to be safe.
 cm:load_global_script "lib.vanish_safe_caller"
-
 local utils = cm:load_global_script "lib.lbm_utils"
 local events_tracker = cm:load_global_script "lib.lbm_events_tracker"
 
