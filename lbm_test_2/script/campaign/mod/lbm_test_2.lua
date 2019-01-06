@@ -243,7 +243,7 @@ core:add_listener(
     end,
     function(context)
         --test_create_force()
-        cm:load_global_script("test.lbm_benchmarks_1")(4)
+        cm:load_global_script("test.lbm_benchmarks_1")(3)
     end,
     true
 )
@@ -274,57 +274,6 @@ core:add_listener(
     end,
     true
 )
-
--- TEMP DEBUG
---[=[
-local army_count_prefix = "lbm_additional_army_unit_count_"
-local upkeep_effect_bundle_prefix = army_count_prefix .. "upkeep_"
-local dummy_upkeep_effect_bundle = upkeep_effect_bundle_prefix .. "dummy"
-local orig_upkeep_effect_bundle_prefix = "wh_main_bundle_force_additional_army_upkeep_"
-
-local custom_ui_listeners = cm:load_global_script "lib.lbm_custom_ui_listeners"
-
-core:add_listener(
-    "ComponentLClickUpLbmTest",
-    "ComponentLClickUp",
-    custom_ui_listeners.enabled,
-    function(context)
-        local uic = UIComponent(context.component)
-        local uic_id = uic:Id()
-        if uic_id:starts_with(orig_upkeep_effect_bundle_prefix) or uic_id == dummy_upkeep_effect_bundle or uicomponent_descended_from(uic, "treasury_holder") then
-            --[
-            local faction = utils.get_faction(cm:get_local_faction(true))
-            --local general_cqi = get_nth_valid_army(faction, 1):general_character():cqi()
-            if faction:has_effect_bundle("wh2_main_incident_hef_campign_movement_up") then
-                cm:remove_effect_bundle("wh2_main_incident_hef_campign_movement_up", faction:name())
-                --cm:apply_effect_bundle_to_characters_force("wh2_main_effect_army_movement_up", general_cqi, 0, false)
-            else
-                cm:apply_effect_bundle("wh2_main_incident_hef_campign_movement_up", faction:name(), 0)
-                --cm:remove_effect_bundle_from_characters_force("wh2_main_effect_army_movement_up", general_cqi)
-            end
-            
-            local orig_upkeep_effect_bundle_found = false
-            local mf_list = faction:military_force_list()
-            for i = 0, mf_list:num_items() - 1 do
-                local mf = mf_list:item_at(i)
-                if not mf:is_armed_citizenry() and mf:has_general() and not character_is_black_ark(mf:general_character()) then -- neither garrison nor black ark
-                    for _, difficulty in ipairs{"easy", "normal", "hard", "very_hard", "legendary"} do
-                        if mf:has_effect_bundle("wh_main_bundle_force_additional_army_upkeep_" .. difficulty) then
-                            out("[WARNING] Found wh_main_bundle_force_additional_army_upkeep_" .. difficulty .. " on army " .. i)
-                            orig_upkeep_effect_bundle_found = true
-                        end
-                    end
-                end
-            end
-            if not orig_upkeep_effect_bundle_found then
-                out("Did not find any wh_main_bundle_force_additional_army_upkeep_* on any armies")
-            end
-            --]]
-        end
-    end,
-    true
-)
---]=]
 
 -- TEMP DEBUG
 --[=[
