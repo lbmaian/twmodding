@@ -17,19 +17,10 @@ end
 
 local config = cm:load_global_script "lbm_unit_count_upkeep_config"
 
--- Copied from wh_campaign_setup.lua
-local function orig_is_valid_faction(faction)
-    local culture = faction:culture()
-    return faction:is_human() and not wh_faction_is_horde(faction) and culture ~= "wh_main_brt_bretonnia" and culture ~= "wh2_dlc09_tmb_tomb_kings"
-end
+-- Function defined in wh_campaign_setup.lua
+local is_valid_faction = upkeep_penalty_condition
 
--- orig_is_valid_faction with a bug fix where Norsca factions erroneously still had supply lines upkeep.
-local function is_valid_faction(faction)
-    local culture = faction:culture()
-    return faction:is_human() and not wh_faction_is_horde(faction) and culture ~= "wh_main_brt_bretonnia" and culture ~= "wh2_dlc09_tmb_tomb_kings" and culture ~= "wh_main_chs_chaos"
-end
-
--- Copied from wh_campaign_setup.lua
+-- Logic copied from wh_campaign_setup.lua
 local function is_valid_army(mf)
     return not mf:is_armed_citizenry() and mf:has_general() and not mf:general_character():character_subtype("wh2_main_def_black_ark") -- neither garrison nor black ark
 end
@@ -384,7 +375,7 @@ cm:add_first_tick_callback(function(context)
     local human_faction_names = cm:get_human_factions()
     for i = 1, #human_faction_names do
         local faction = utils.get_faction(human_faction_names[i])
-        if orig_is_valid_faction(faction) then
+        if is_valid_faction(faction) then
             local mf_list = faction:military_force_list()
             for j = 1, mf_list:num_items() - 1 do -- mf_list is 0-indexed, and explicitly ignoring the first army since it shouldn't have effect applied to it
                 local mf = mf_list:item_at(j)
